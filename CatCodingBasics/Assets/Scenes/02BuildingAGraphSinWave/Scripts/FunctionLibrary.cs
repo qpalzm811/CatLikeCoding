@@ -1,13 +1,14 @@
-using System;
 using UnityEditor.Rendering;
 using UnityEngine;
 using static UnityEngine.Mathf;
 public static class FunctionLibrary
 {
     public delegate Vector3 Function(float u, float v, float time);
-    public enum FunctionsName
+    public enum FunctionName
     {
-        Wave, MultiWave, Ripple, CylinderWithCollapsingRadius, StaticSphere, DynamicSphere,
+        Wave, MultiWave, Ripple,
+        CylinderWithCollapsingRadius,
+        StaticSphere, DynamicSphere,
         VerticalBandsSphere,
         VerticalBandsDynamicSphere,
         HorizontalBandsSphere,
@@ -32,11 +33,52 @@ public static class FunctionLibrary
         StaticTorus,
         StarTwistingTorus,
     };
-    public static Function GetFunction(FunctionsName name)
+    public static Function GetFunction(FunctionName name)
     {
         return functions[(int)name];
     }
 
+    // 返回下一个函数
+    public static FunctionName  GetNextFunctionName(FunctionName  name)
+    {
+        if ((int)name < functions.Length - 1) {
+            return name + 1;
+        }
+        else {
+            return 0;
+        }
+    }
+    // 获取随机函数
+    public static FunctionName GetRandomFunctionNameOtherThan(FunctionName name) {
+        var choice = (FunctionName)Random.Range(0, functions.Length);
+        while (true)
+        {
+            // 保证每次不会重复
+            if (name == choice)
+            {
+                choice = (FunctionName)Random.Range(0, functions.Length);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        return choice;
+    }
+
+    // 插值变化 各个功能
+    public static Vector3 Morph(
+        float u, float v, float t, Function from, Function to, float progress
+    )
+    {
+        // SmoothStep = 3x^2-2x^3
+        // Lerp会把第三个参数范围在 0~1，因为SmoothStep做了，就用LerpUnclamped
+        return Vector3.LerpUnclamped(
+            from(u, v, t), to(u, v, t), SmoothStep(0f, 1f, progress)
+            );
+    }
+    
     // f(x,t)=sin(π(x+t))
     public static Vector3 Wave(float u, float v, float time)
     {

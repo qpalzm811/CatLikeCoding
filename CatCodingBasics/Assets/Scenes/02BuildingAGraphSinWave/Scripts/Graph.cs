@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 
 public class Graph : MonoBehaviour
@@ -9,10 +10,24 @@ public class Graph : MonoBehaviour
     [SerializeField, Range(10, 100)] private int resolution = 10;
     
     // [SerializeField, Range(0, 1)] private int function;
-    [SerializeField] private FunctionLibrary.FunctionsName function;
+    [SerializeField] private FunctionLibrary.FunctionName function;
+    
+    public enum TransitionMode { Cycle, Random, }
+    [SerializeField] private TransitionMode transitionMode;
+    
     
     private Transform[] points;
+    
+    // 每个函数持续的时间，0的话每帧都切换函数
+    [SerializeField, Min(0f)] 
+    private float functionDuration = 1f, transitionDuration = 1f;
 
+    private float duration;
+    
+    bool transitioning;
+    // 用于存储当前运行的功能 函数名
+    FunctionLibrary.FunctionName transitionFunction;
+    
     void Awake()
     {
         points = new Transform[resolution * resolution];
@@ -31,15 +46,49 @@ public class Graph : MonoBehaviour
             
         }
     }
-
-    // Start is called before the first frame update
-    void Start()
+    
+    // Update is called once per frame
+    void Update()
     {
+        duration += Time.deltaTime;
+        if (transitioning)
+        {
+            // 不能让过渡的状态一直持续，过渡一次之后要false
+            // 并且记得减去持续时间
+            if (duration >= transitionDuration) {
+                duration -= transitionDuration;
+                transitioning = false;
+            }
+        }
+        else if (duration >= functionDuration)
+        {
+            // 难易精确到达 functionDuration这个时间，应该是每次超出一点
+            // 所以保持每次切换时间都一致，所以减的数都一样是 functionDuration
+            duration -= functionDuration;
+
+            // 将要切换函数，存下现在运行的功能
+            transitioning = true;
+            transitionFunction = function;
+
+            PickNextFunction();
+        }
+
+        if (transitioning) {
+            UpdateFunctionTransition();
+        }
+        else {
+            UpdateFunction();
+        }
         
     }
 
-    // Update is called once per frame
-    void Update()
+    void PickNextFunction()
+    {
+        function = transitionMode == TransitionMode.Cycle ?
+            FunctionLibrary.GetNextFunctionName(function) :
+            FunctionLibrary.GetRandomFunctionNameOtherThan(function);
+    }
+    void UpdateFunction()
     {
         // 获取函数
         FunctionLibrary.Function f = FunctionLibrary.GetFunction(function);
@@ -55,15 +104,29 @@ public class Graph : MonoBehaviour
             float u = (x + 0.5f) * step - 1f;
             points[i].localPosition = f(u, v, time);
         }
+    }
+    // 过渡
+    void UpdateFunctionTransition()
+    {
+        // 获取函数 上一个 下一个函数，progress是 持续时间 / 过渡时间
+        FunctionLibrary.Function
+            from = FunctionLibrary.GetFunction(transitionFunction),
+            to = FunctionLibrary.GetFunction(function);
+        float progress = duration / transitionDuration;
         
-        // 当xy点是恒定的时候，用x和y确定y位置的时候
-        // for (int i = 0; i < points.Length; i++)
-        // {
-        //     Transform point = points[i];
-        //     Vector3 position = point.localPosition;
-        //     // 每次刷新只改变y的值
-        //     position.y = f(position.x, position.z, time);
-        //     point.localPosition = position;
-        // }
+        float time = Time.time;
+        float step = 2f / resolution;
+        float v = 0.5f * step - 1f;   // 当z变化的时候v才要变化，提出来初始化
+        for (int i = 0, x = 0, z = 0; i < points.Length; i++, x++) {
+            if (x == resolution) {
+                x = 0;
+                z += 1;
+                v = (z + 0.5f) * step - 1f;
+            }
+            float u = (x + 0.5f) * step - 1f;
+            points[i].localPosition = FunctionLibrary.Morph(
+                u, v, time, from, to, progress
+            );
+        }
     }
 }
