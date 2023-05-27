@@ -100,6 +100,10 @@ public class Graph : MonoBehaviour
                 x = 0;
                 z += 1;
                 v = (z + 0.5f) * step - 1f;
+                // 给x和y分量各加上0.5。这一步是为了将采样位置移动到像素/纹素的中心，以减少采样误差。
+                // (id.xy + 0.5) * _Step: 将结果乘以步长（_Step）参数，
+                // 将整数坐标映射到对应的UV范围内。步长通常等于1除以纹理的宽度或高度。
+                // 最后，将结果减去1.0，将UV坐标范围从[0, 1]调整到[-1, 0]。
             }
             float u = (x + 0.5f) * step - 1f;
             points[i].localPosition = f(u, v, time);

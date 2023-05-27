@@ -1,0 +1,53 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel FunctionKernel
+
+#define PI 3.14159265358979323846
+
+// 步长
+float _Step;
+float2 GetUV (uint3 id) {
+    // 给x和y分量各加上0.5。这一步是为了将采样位置移动到像素/纹素的中心，以减少采样误差。
+    // (id.xy + 0.5) * _Step: 将结果乘以步长（_Step）参数，
+    // 将整数坐标映射到对应的UV范围内。步长通常等于1除以纹理的宽度或高度。
+    // 最后，将结果减去1.0，将UV坐标范围从[0, 1]调整到[-1, 0]。
+    return (id.xy + 0.5) * _Step - 1.0;
+}
+
+// position buffer 存储位置
+// RWStructuredBuffer: read-write enabled version
+// StructuredBuffer: only read enabled version 只需要读取的时候用
+
+StructuredBuffer<float3> _Positions;
+
+// 位置的索引，基于 线程的 thread identifier.
+uint _Resolution;
+void SetPosition (uint3 id, float3 position)
+{
+    if (id.x < _Resolution && id.y < _Resolution)
+     // 防止溢出   
+    {
+        _Positions[id.x + id.y * _Resolution] = position;
+    }
+}
+
+float _Time;
+float3 Wave (float u, float v, float t) {
+    float3 p;
+    p.x = u;
+    p.y = sin(PI * (u + v + t));
+    p.z = v;
+    return p;
+}
+// // 定义在调度计算着色器时 要在单个线程组中执行的线程数
+// X、Y 和 Z 值指示特定方向的线程组的大小
+// X*Y*Z 的总数为组中的线程数。
+// 例如，如果计算着色器正在添加 4x4 矩阵，则可以将数字线程设置为 numthreads (4，4，1) 
+[numthreads(8, 8, 1)]
+// 每个线程通过 3个无符号整形向量确定，可以通过添加的这个id，访问这个函数
+// 明确表示id用于线程标识，通过写SV_DispatchThreadID 表示
+void FunctionKernel (uint3 id: SV_DispatchThreadID )
+{
+    float2 uv = GetUV(id);
+    SetPosition(id, Wave(uv.x, uv.y, _Time));
+}
+
