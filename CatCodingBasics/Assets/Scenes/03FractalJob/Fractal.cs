@@ -29,7 +29,7 @@ public class Fractal : MonoBehaviour
         public Quaternion rotation;
         public Transform transform;
     }
-    
+    // 二维，为同一级别的所有部分提供自己的数组
     FractalPart[][] parts;
     
     // 添加子索引，因为每个孩子都有 各自的方向和旋转
@@ -55,6 +55,7 @@ public class Fractal : MonoBehaviour
     void Awake()
     {
         // 不需要防止无限递归，所以不需要等到Start
+        
         parts = new FractalPart[depth][];
         for (int i = 0, length = 1; i < parts.Length; i++, length *= 5) {
             // 每个Level都是前一个Level的五倍，五个子级所以五个元素大小
@@ -64,8 +65,13 @@ public class Fractal : MonoBehaviour
         float scale = 1f;
         parts[0][0] = CreatePart(0,0, scale);
         
-        for (int li = 0; li < parts.Length; li++)
+        for (int li = 1; li < parts.Length; li++)
         {
+            // li代表层级索引，ci代表这个层级孩子索引
+            // 这个地方 li从1开始 因为0级的大球只有一个 (就在上面实例化
+            
+            scale *= 0.5f;
+            
             FractalPart[] levelParts = parts[li];
             for (int fpi = 0; fpi < levelParts.Length; fpi += 5)
             {
@@ -81,13 +87,18 @@ public class Fractal : MonoBehaviour
         for (int li = 1; li < parts.Length; li++) {
             FractalPart[] parentParts = parts[li - 1];
             FractalPart[] levelParts = parts[li];
+            
             for (int fpi = 0; fpi < levelParts.Length; fpi++) {
                 Transform parentTransform = parentParts[fpi / 5].transform;
                 FractalPart part = levelParts[fpi];
-                part.transform.localRotation = part.rotation;
+                
+                part.transform.localRotation =
+                    parentTransform.localRotation * part.rotation;
+                
                 part.transform.localPosition =
                     parentTransform.localPosition +
                     1.5f * part.transform.localScale.x * part.direction;
+                // 1.5会为了避免圆球之间距离太近了
             }
         }
     }
